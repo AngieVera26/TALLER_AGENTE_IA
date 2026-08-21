@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import './App.css';
 
 function App() {
@@ -28,45 +28,45 @@ function App() {
 
     const userMessage = { text: input, file: selectedFile, sender: 'user' };
     setMessages((prev) => [...prev, userMessage]);
-    
+
     const currentInput = input;
     const currentFile = selectedFile;
-    
+
     setInput('');
     setSelectedFile(null);
     setLoading(true);
 
     try {
-      // Instanciación dentro del manejador para asegurar que la API Key esté disponible
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error("No se encontró VITE_GEMINI_API_KEY en el entorno.");
+        throw new Error("No se encontró VITE_GEMINI_API_KEY");
       }
-      const ai = new GoogleGenAI({ apiKey });
 
-      const parts = [];
-      
+      // Inicialización con el SDK oficial
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      const contents = [];
+
       if (currentFile) {
-        const imagePart = await fileToGenerativePart(currentFile);
-        parts.push(imagePart);
+        const filePart = await fileToGenerativePart(currentFile);
+        contents.push(filePart);
       }
-      
+
       if (currentInput.trim()) {
-        parts.push({ text: currentInput });
+        contents.push(currentInput);
       }
 
-      // Llamada corregida con Gemini 2.5 Flash
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: parts,
-      });
+      const result = await model.generateContent(contents);
+      const response = await result.response;
+      const text = response.text();
 
-      setMessages((prev) => [...prev, { text: response.text, sender: 'model' }]);
+      setMessages((prev) => [...prev, { text: text, sender: 'model' }]);
     } catch (error) {
-      console.error("Error al llamar a Gemini:", error);
+      console.error("Error al consultar Gemini:", error);
       setMessages((prev) => [
-        ...prev, 
-        { text: "Ocurrió un error al consultar a la IA. Verifica tu API Key.", sender: 'model' }
+        ...prev,
+        { text: "Error al conectar con la API. Revisa la consola para más detalles.", sender: 'model' },
       ]);
     } finally {
       setLoading(false);
