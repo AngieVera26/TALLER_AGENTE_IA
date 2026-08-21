@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import './App.css';
 
-// Inicialización del cliente con la variable de entorno
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 function App() {
