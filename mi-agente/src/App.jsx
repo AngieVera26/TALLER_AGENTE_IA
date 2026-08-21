@@ -5,6 +5,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState(null);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -59,6 +60,12 @@ function App() {
     }
   };
 
+  const handleCopy = (text, idx) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(idx);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
   const handleClearSession = () => {
     setMessages([]);
   };
@@ -97,6 +104,15 @@ function App() {
               <div key={idx} className={`message-row ${msg.sender}`}>
                 <div className="message-content">
                   <p>{msg.text}</p>
+                  {msg.sender === 'model' && (
+                    <button 
+                      className="btn-copy" 
+                      onClick={() => handleCopy(msg.text, idx)}
+                      title="Copiar texto"
+                    >
+                      {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
