@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { GoogleGenAI } from '@google/genai';
 import './App.css';
+
+// Inicialización del cliente con la variable de entorno
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -27,24 +31,40 @@ function App() {
 
     const userMessage = { text: input, file: selectedFile, sender: 'user' };
     setMessages((prev) => [...prev, userMessage]);
+    
+    const currentInput = input;
+    const currentFile = selectedFile;
+    
     setInput('');
+    setSelectedFile(null);
     setLoading(true);
 
     try {
-      let imagePart = null;
-      if (selectedFile) {
-        imagePart = await fileToGenerativePart(selectedFile);
+      const contents = [];
+      
+      if (currentFile) {
+        const imagePart = await fileToGenerativePart(currentFile);
+        contents.push(imagePart);
+      }
+      
+      if (currentInput.trim()) {
+        contents.push(currentInput);
       }
 
-      // Reemplazar con la llamada a la API de Gemini
-      const responseText = "Respuesta de Nexus AI basada en tu consulta."; 
-      
-      setMessages((prev) => [...prev, { text: responseText, sender: 'model' }]);
+      // Llamada real al modelo Gemini 2.5 Flash
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: contents,
+      });
+
+      setMessages((prev) => [...prev, { text: response.text, sender: 'model' }]);
     } catch (error) {
-      console.error(error);
-      setMessages((prev) => [...prev, { text: "Error al procesar tu solicitud.", sender: 'model' }]);
+      console.error("Error al llamar a Gemini:", error);
+      setMessages((prev) => [
+        ...prev, 
+        { text: "Ocurrió un error al consultar a la IA. Verifica tu API Key.", sender: 'model' }
+      ]);
     } finally {
-      setSelectedFile(null);
       setLoading(false);
     }
   };
@@ -56,7 +76,6 @@ function App() {
 
   return (
     <div className="app-layout">
-      {/* Sidebar fija estilo Gemini */}
       <aside className="sidebar">
         <div className="sidebar-top">
           <button className="btn-icon-new" onClick={() => setMessages([])} title="Nuevo Chat">
@@ -77,7 +96,6 @@ function App() {
         </div>
       </aside>
 
-      {/* Área principal */}
       <main className="chat-container">
         {messages.length === 0 ? (
           <div className="welcome-screen">
@@ -96,11 +114,16 @@ function App() {
                 </div>
               </div>
             ))}
-            {loading && <div className="message-row model"><p className="loading-text">Nexus AI está pensando...</p></div>}
+            {loading && (
+              <div className="message-row model">
+                <div className="message-content">
+                  <p className="loading-text">Nexus AI está pensando...</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Input flotante centralizado */}
         <div className="input-container-wrapper">
           <div className="input-box">
             <label htmlFor="file-upload" className="file-upload-label" title="Adjuntar archivo o imagen">
@@ -119,12 +142,13 @@ function App() {
               placeholder="Pregunta a Nexus AI..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              onKeyDown={(e) => e.key === 'Enter' && !loading && handleSend()}
+              disabled={loading}
             />
 
             {selectedFile && <span className="selected-file-badge">{selectedFile.name}</span>}
 
-            <button className="btn-send-gemini" onClick={handleSend}>
+            <button className="btn-send-gemini" onClick={handleSend} disabled={loading}>
               ➔
             </button>
           </div>
