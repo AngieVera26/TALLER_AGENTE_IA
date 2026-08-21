@@ -32,8 +32,8 @@ function App() {
     setMessages([]);
   };
 
-  // Función para eliminar asteriscos, numerales y símbolos molestos de la respuesta
-  const formatText = (text) => {
+  // Limpia marcas de formato y preserva estructura
+  const cleanMarkdown = (text) => {
     if (!text) return '';
     return text
       .replace(/\*\*/g, '')
@@ -46,9 +46,9 @@ function App() {
     if (!input.trim() || loading) return;
 
     const userMessage = { text: input, sender: 'user' };
-    const newMessages = [...messages, userMessage];
+    const updatedMessagesWithUser = [...messages, userMessage];
 
-    setMessages(newMessages);
+    setMessages(updatedMessagesWithUser);
     const currentInput = input;
     setInput('');
     setLoading(true);
@@ -59,27 +59,31 @@ function App() {
       setCurrentSessionId(activeId);
     }
 
+    // Construir historial completo para Gemini (memoria de conversación)
+    const formattedContents = updatedMessagesWithUser.map((msg) => ({
+      role: msg.sender === 'user' ? 'user' : 'model',
+      parts: [
+        {
+          text: msg.sender === 'user' 
+            ? `${msg.text}\n(Nota: Responde utilizando saltos de línea claros y listas numeradas o con viñetas sin usar asteriscos ni negritas)`
+            : msg.text
+        }
+      ]
+    }));
+
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) throw new Error("No se encontró la clave VITE_GEMINI_API_KEY");
 
-      // Endpoint oficial y actualizado con el modelo correcto: gemini-3.6-flash
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `Responde de forma clara, detallada y estructurada usando saltos de línea claros entre cada punto o sección. Pregunta: ${currentInput}`
-                  }
-                ]
-              }
-            ],
+            contents: formattedContents,
             generationConfig: {
+              temperature: 0.7,
               maxOutputTokens: 3000,
             },
           }),
@@ -89,15 +93,15 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error("Detalle del error desde Google:", data);
-        throw new Error(data.error?.message || 'Error en la API');
+        console.error("Detalle de error Gemini:", data);
+        throw new Error(data.error?.message || 'Error en la respuesta');
       }
 
       const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta del modelo.";
-      const cleanReply = formatText(rawReply);
+      const cleanReply = cleanMarkdown(rawReply);
 
-      const updatedMessages = [...newMessages, { text: cleanReply, sender: 'model' }];
-      setMessages(updatedMessages);
+      const finalMessages = [...updatedMessagesWithUser, { text: cleanReply, sender: 'model' }];
+      setMessages(finalMessages);
 
       setSessions((prevSessions) => {
         const existingIndex = prevSessions.findIndex((s) => s.id === activeId);
@@ -105,10 +109,10 @@ function App() {
 
         if (existingIndex >= 0) {
           const updated = [...prevSessions];
-          updated[existingIndex].messages = updatedMessages;
+          updated[existingIndex].messages = finalMessages;
           return updated;
         } else {
-          return [{ id: activeId, title, messages: updatedMessages }, ...prevSessions];
+          return [{ id: activeId, title, messages: finalMessages }, ...prevSessions];
         }
       });
     } catch (error) {
