@@ -7,7 +7,6 @@ function App() {
       const saved = localStorage.getItem('nexus_chats');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
-      console.error("Error al leer localStorage", e);
       return [];
     }
   });
@@ -41,25 +40,24 @@ function App() {
     setMessages([]);
   };
 
-  const formatText = (text) => {
+  const cleanFormat = (text) => {
     if (!text) return '';
     return text
       .replace(/\*\*/g, '')
       .replace(/\*/g, '')
       .replace(/^#+\s*/gm, '')
       .replace(/---+/g, '')
-      .replace(/(\d+\.\s)/g, '\n$1')
       .trim();
   };
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
-    const userMessage = { text: input, sender: 'user' };
-    const updatedMessagesWithUser = [...messages, userMessage];
+    const userText = input.trim();
+    const userMessage = { text: userText, sender: 'user' };
+    const updatedMessages = [...messages, userMessage];
 
-    setMessages(updatedMessagesWithUser);
-    const currentInput = input;
+    setMessages(updatedMessages);
     setInput('');
     setLoading(true);
 
@@ -69,54 +67,35 @@ function App() {
       setCurrentSessionId(activeId);
     }
 
-    // Adaptar historial al formato de Gemini API
-    const formattedContents = updatedMessagesWithUser.map((msg) => ({
-      role: msg.sender === 'user' ? 'user' : 'model',
-      parts: [
-        {
-          text: msg.sender === 'user'
-            ? `${msg.text}\n(Nota: Responde de forma limpia, separando cada elemento con saltos de línea claros y sin usar asteriscos ni negritas)`
-            : msg.text
-        }
-      ]
-    }));
-
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("No se encontró la clave VITE_GEMINI_API_KEY");
+      if (!apiKey) {
+        throw new Error("No se encontró la clave VITE_GEMINI_API_KEY");
+      }
 
-      let response = await fetch(
+      const recentMessages = updatedMessages.slice(-6);
+      const apiContents = recentMessages.map((msg) => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text || '' }]
+      }));
+
+      apiContents[apiContents.length - 1].parts[0].text += 
+        "\n\n(Instrucción de formato: Responde usando texto claro, listas ordenadas y saltos de línea sin usar asteriscos ni negritas)";
+
+      const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: formattedContents,
+            contents: apiContents,
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 3000,
+              maxOutputTokens: 2500,
             },
           }),
         }
       );
-
-      if (response.status === 429) {
-        await new Promise((resolve) => setTimeout(resolve, 2500));
-        response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: formattedContents,
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 3000,
-              },
-            }),
-          }
-        );
-      }
 
       const data = await response.json();
 
@@ -124,18 +103,18 @@ function App() {
         if (response.status === 429) {
           throw new Error("Límite de solicitudes alcanzado. Espera unos segundos e intenta de nuevo.");
         }
-        throw new Error(data.error?.message || 'Error en la respuesta');
+        throw new Error(data.error?.message || 'Error al conectar con la IA');
       }
 
-      const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta del modelo.";
-      const cleanReply = formatText(rawReply);
+      const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No se obtuvo respuesta del modelo.";
+      const cleanReply = cleanFormat(rawReply);
 
-      const finalMessages = [...updatedMessagesWithUser, { text: cleanReply, sender: 'model' }];
+      const finalMessages = [...updatedMessages, { text: cleanReply, sender: 'model' }];
       setMessages(finalMessages);
 
       setSessions((prevSessions) => {
         const existingIndex = prevSessions.findIndex((s) => s.id === activeId);
-        const title = currentInput.length > 25 ? currentInput.substring(0, 25) + '...' : currentInput;
+        const title = userText.length > 25 ? userText.substring(0, 25) + '...' : userText;
 
         if (existingIndex >= 0) {
           const updated = [...prevSessions];
@@ -149,14 +128,14 @@ function App() {
         }
       });
     } catch (error) {
-      console.error("Error capturado:", error);
-      const errorMessage = error.message.includes("Límite de solicitudes")
+      console.error("Error en la llamada:", error);
+      const fallbackText = error.message.includes("Límite de solicitudes")
         ? error.message
-        : "Ocurrió un error al consultar la IA. Intenta de nuevo en unos segundos.";
+        : "Ocurrió un problema temporal con la consulta. Por favor intenta de nuevo.";
 
       setMessages((prev) => [
         ...prev,
-        { text: errorMessage, sender: 'model' },
+        { text: fallbackText, sender: 'model' },
       ]);
     } finally {
       setLoading(false);
@@ -164,21 +143,21 @@ function App() {
   };
 
   const handleCopy = (text, idx) => {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-999999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
     try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
       document.execCommand('copy');
+      document.body.removeChild(textArea);
       setCopiedIndex(idx);
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {
       console.error('Error al copiar', err);
     }
-    document.body.removeChild(textArea);
   };
 
   const deleteSession = (id, e) => {
