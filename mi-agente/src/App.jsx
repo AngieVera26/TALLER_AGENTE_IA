@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import './App.css';
 
@@ -7,6 +7,16 @@ function App() {
   const [input, setInput] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  // Referencia para scroll automático al último mensaje
+  const messagesEndRef = useRef(null);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const fileToGenerativePart = async (file) => {
     return new Promise((resolve) => {
@@ -37,12 +47,12 @@ function App() {
     setLoading(true);
 
     try {
+      // 1. Verificar API Key
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error("No se encontró VITE_GEMINI_API_KEY");
+        throw new Error("API Key no configurada. Verifica tu archivo .env");
       }
 
-      // Inicialización con el modelo estable
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -50,11 +60,13 @@ function App() {
 
       if (currentFile) {
         const filePart = await fileToGenerativePart(currentFile);
-        const prompt = currentInput.trim() ? currentInput : "Describe o analiza este archivo.";
+        const prompt = currentInput.trim() ? currentInput : "Analiza esta imagen/archivo.";
+        // Nota: Los archivos se envían en un array
         const result = await model.generateContent([prompt, filePart]);
         const response = await result.response;
         responseText = response.text();
       } else {
+        // Enviar solo texto
         const result = await model.generateContent(currentInput);
         const response = await result.response;
         responseText = response.text();
@@ -62,19 +74,20 @@ function App() {
 
       setMessages((prev) => [...prev, { text: responseText, sender: 'model' }]);
     } catch (error) {
-      console.error("Error detallado de Gemini:", error);
+      console.error("Error detallado:", error);
+      
+      // Mensaje de error más descriptivo para ayudarte a debugear
+      let errorMessage = "Ocurrió un error de conexión.";
+      if (error.message.includes("API Key")) errorMessage = "Error: API Key no encontrada.";
+      if (error.message.includes("403")) errorMessage = "Error: API Key inválida o sin permisos.";
+      
       setMessages((prev) => [
         ...prev,
-        { text: "Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.", sender: 'model' },
+        { text: errorMessage, sender: 'model' },
       ]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleClearSession = () => {
-    setMessages([]);
-    localStorage.removeItem('chat_history');
   };
 
   return (
@@ -82,19 +95,18 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-top">
           <button className="btn-icon-new" onClick={() => setMessages([])} title="Nuevo Chat">
-            <span className="plus-icon">+</span>
+            <span>+</span>
           </button>
+          <p style={{fontSize: '10px', color: 'var(--text-secondary)', marginTop: '5px'}}>Conversación</p>
         </div>
 
         <div className="history-list">
-          {messages.length > 0 && (
-            <div className="history-item active">Conversación actual</div>
-          )}
+          {/* Aquí podrías mapear un historial real */}
         </div>
 
         <div className="sidebar-bottom">
-          <button className="btn-delete-session" onClick={handleClearSession}>
-            🗑️ Borrar sesión
+          <button className="btn-delete-session" onClick={() => setMessages([])}>
+            🗑️ Borrar
           </button>
         </div>
       </aside>
@@ -111,7 +123,9 @@ function App() {
               <div key={idx} className={`message-row ${msg.sender}`}>
                 <div className="message-content">
                   {msg.file && (
-                    <div className="file-preview-tag">📎 {msg.file.name}</div>
+                    <div style={{fontSize: '0.8rem', color: '#a8c7fa', marginBottom: '5px'}}>
+                      📎 {msg.file.name}
+                    </div>
                   )}
                   <p>{msg.text}</p>
                 </div>
@@ -124,12 +138,13 @@ function App() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
         )}
 
         <div className="input-container-wrapper">
           <div className="input-box">
-            <label htmlFor="file-upload" className="file-upload-label" title="Adjuntar archivo o imagen">
+            <label htmlFor="file-upload" className="file-upload-label">
               +
             </label>
             <input
@@ -145,8 +160,7 @@ function App() {
               placeholder="Pregunta a Nexus AI..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !loading && handleSend()}
-              disabled={loading}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             />
 
             {selectedFile && <span className="selected-file-badge">{selectedFile.name}</span>}
