@@ -213,7 +213,7 @@ function App() {
       <main className="chat-container">
         {messages.length === 0 ? (
           <div className="welcome-screen">
-            <h1 className="welcome-title">El micrófono es tuyo, Angie</h1>
+            <h1 className="welcome-title">El micrófono es tuyo, Colega</h1>
             <p className="welcome-subtitle">¿En qué puedo ayudarte hoy?</p>
           </div>
         ) : (
