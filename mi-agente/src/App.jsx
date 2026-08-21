@@ -3,8 +3,13 @@ import './App.css';
 
 function App() {
   const [sessions, setSessions] = useState(() => {
-    const saved = localStorage.getItem('nexus_chats');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('nexus_chats');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Error al leer localStorage", e);
+      return [];
+    }
   });
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -16,7 +21,7 @@ function App() {
     if (currentSessionId) {
       const activeSession = sessions.find((s) => s.id === currentSessionId);
       if (activeSession) {
-        setMessages(activeSession.messages);
+        setMessages(activeSession.messages || []);
       }
     } else {
       setMessages([]);
@@ -24,7 +29,11 @@ function App() {
   }, [currentSessionId]);
 
   useEffect(() => {
-    localStorage.setItem('nexus_chats', JSON.stringify(sessions));
+    try {
+      localStorage.setItem('nexus_chats', JSON.stringify(sessions));
+    } catch (e) {
+      console.error("Error al guardar en localStorage", e);
+    }
   }, [sessions]);
 
   const createNewChat = () => {
@@ -32,7 +41,6 @@ function App() {
     setMessages([]);
   };
 
-  // Limpia y formatea la respuesta para que NUNCA aparezca pegada
   const formatText = (text) => {
     if (!text) return '';
     return text
@@ -40,7 +48,6 @@ function App() {
       .replace(/\*/g, '')
       .replace(/^#+\s*/gm, '')
       .replace(/---+/g, '')
-      // Garantizar que los puntos numerados (ej: 1. 2.) tengan salto de línea previo
       .replace(/(\d+\.\s)/g, '\n$1')
       .trim();
   };
@@ -62,7 +69,7 @@ function App() {
       setCurrentSessionId(activeId);
     }
 
-    // Historial con contexto de conversación
+    // Adaptar historial al formato de Gemini API
     const formattedContents = updatedMessagesWithUser.map((msg) => ({
       role: msg.sender === 'user' ? 'user' : 'model',
       parts: [
@@ -93,9 +100,7 @@ function App() {
         }
       );
 
-      // Si alcanzamos el límite de cuota (429), esperamos 2.5 segundos y reintentamos automáticamente 1 vez
       if (response.status === 429) {
-        console.warn("Límite de peticiones alcanzado (429). Reintentando en 2.5 segundos...");
         await new Promise((resolve) => setTimeout(resolve, 2500));
         response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
@@ -117,7 +122,7 @@ function App() {
 
       if (!response.ok) {
         if (response.status === 429) {
-          throw new Error("Superaste el límite de preguntas por minuto de Google. Por favor, espera 5 segundos e intenta de nuevo.");
+          throw new Error("Límite de solicitudes alcanzado. Espera unos segundos e intenta de nuevo.");
         }
         throw new Error(data.error?.message || 'Error en la respuesta');
       }
@@ -134,15 +139,18 @@ function App() {
 
         if (existingIndex >= 0) {
           const updated = [...prevSessions];
-          updated[existingIndex].messages = finalMessages;
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            messages: finalMessages,
+          };
           return updated;
         } else {
-          return [{ id: activeId, title, messages: updatedMessages }, ...prevSessions];
+          return [{ id: activeId, title, messages: finalMessages }, ...prevSessions];
         }
       });
     } catch (error) {
       console.error("Error capturado:", error);
-      const errorMessage = error.message.includes("límite de preguntas")
+      const errorMessage = error.message.includes("Límite de solicitudes")
         ? error.message
         : "Ocurrió un error al consultar la IA. Intenta de nuevo en unos segundos.";
 
