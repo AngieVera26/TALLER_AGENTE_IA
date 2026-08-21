@@ -23,7 +23,6 @@ function App() {
         throw new Error("No se encontró VITE_GEMINI_API_KEY");
       }
 
-      // Solicitud optimizada con parametros de generación rapida
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
@@ -32,14 +31,10 @@ function App() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: currentInput }],
-              },
-            ],
+            contents: [{ parts: [{ text: currentInput }] }],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 1000,
+              maxOutputTokens: 800,
             },
           }),
         }
@@ -55,7 +50,7 @@ function App() {
 
       setMessages((prev) => [...prev, { text: botReply, sender: 'model' }]);
     } catch (error) {
-      console.error("Error al consultar la API:", error);
+      console.error("Error:", error);
       setMessages((prev) => [
         ...prev,
         { text: "Ocurrió un error al consultar la IA. Intenta de nuevo.", sender: 'model' },
@@ -65,56 +60,33 @@ function App() {
     }
   };
 
-  // Función de copiado ultra compatible
   const handleCopy = (text, idx) => {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(() => {
-        setCopiedIndex(idx);
-        setTimeout(() => setCopiedIndex(null), 2000);
-      });
-    } else {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.position = "fixed";
-      textArea.style.left = "-999999px";
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        setCopiedIndex(idx);
-        setTimeout(() => setCopiedIndex(null), 2000);
-      } catch (err) {
-        console.error('Error al copiar text: ', err);
-      }
-      document.body.removeChild(textArea);
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopiedIndex(idx);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      console.error('Error al copiar', err);
     }
-  };
-
-  const handleClearSession = () => {
-    setMessages([]);
+    document.body.removeChild(textArea);
   };
 
   return (
     <div className="app-layout">
       <aside className="sidebar">
-        <div className="sidebar-top">
-          <button className="btn-icon-new" onClick={handleClearSession} title="Nuevo Chat">
-            +
-          </button>
-        </div>
-
-        <div className="history-list">
-          {messages.length > 0 && (
-            <div className="history-item active">Chat activo</div>
-          )}
-        </div>
-
-        <div className="sidebar-bottom">
-          <button className="btn-delete-session" onClick={handleClearSession} title="Borrar sesión">
-            🗑️
-          </button>
-        </div>
+        <button className="btn-icon-new" onClick={() => setMessages([])} title="Nuevo Chat">
+          +
+        </button>
+        <button className="btn-delete-session" onClick={() => setMessages([])} title="Borrar sesión">
+          🗑️
+        </button>
       </aside>
 
       <main className="chat-container">
@@ -130,11 +102,7 @@ function App() {
                 <div className="message-content">
                   <p>{msg.text}</p>
                   {msg.sender === 'model' && (
-                    <button 
-                      className="btn-copy" 
-                      onClick={() => handleCopy(msg.text, idx)}
-                      title="Copiar texto"
-                    >
+                    <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
                       {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
                     </button>
                   )}
