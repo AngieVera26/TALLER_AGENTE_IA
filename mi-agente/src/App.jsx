@@ -22,9 +22,9 @@ function App() {
         throw new Error("No se encontró la variable VITE_GEMINI_API_KEY");
       }
 
-      // Llamada HTTP directa a la API de Gemini 2.5 Flash
+      // Llamada corregida con el modelo requerido gemini-3.6-flash
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -66,7 +66,6 @@ function App() {
 
   return (
     <div className="app-layout">
-      {/* Barra lateral limpia */}
       <aside className="sidebar">
         <div className="sidebar-top">
           <button className="btn-icon-new" onClick={handleClearSession} title="Nuevo Chat">
@@ -87,7 +86,6 @@ function App() {
         </div>
       </aside>
 
-      {/* Pantalla Principal */}
       <main className="chat-container">
         {messages.length === 0 ? (
           <div className="welcome-screen">
@@ -113,7 +111,6 @@ function App() {
           </div>
         )}
 
-        {/* Input central estilo Gemini */}
         <div className="input-container-wrapper">
           <div className="input-box">
             <input
