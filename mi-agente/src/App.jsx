@@ -42,31 +42,30 @@ function App() {
         throw new Error("No se encontró VITE_GEMINI_API_KEY");
       }
 
-      // Inicialización con el SDK oficial
+      // Inicialización con el modelo estable
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const contents = [];
+      let responseText = "";
 
       if (currentFile) {
         const filePart = await fileToGenerativePart(currentFile);
-        contents.push(filePart);
+        const prompt = currentInput.trim() ? currentInput : "Describe o analiza este archivo.";
+        const result = await model.generateContent([prompt, filePart]);
+        const response = await result.response;
+        responseText = response.text();
+      } else {
+        const result = await model.generateContent(currentInput);
+        const response = await result.response;
+        responseText = response.text();
       }
 
-      if (currentInput.trim()) {
-        contents.push(currentInput);
-      }
-
-      const result = await model.generateContent(contents);
-      const response = await result.response;
-      const text = response.text();
-
-      setMessages((prev) => [...prev, { text: text, sender: 'model' }]);
+      setMessages((prev) => [...prev, { text: responseText, sender: 'model' }]);
     } catch (error) {
-      console.error("Error al consultar Gemini:", error);
+      console.error("Error detallado de Gemini:", error);
       setMessages((prev) => [
         ...prev,
-        { text: "Error al conectar con la API. Revisa la consola para más detalles.", sender: 'model' },
+        { text: "Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.", sender: 'model' },
       ]);
     } finally {
       setLoading(false);
