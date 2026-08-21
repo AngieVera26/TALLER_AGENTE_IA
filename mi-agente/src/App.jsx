@@ -5,7 +5,6 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState(null);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -20,7 +19,7 @@ function App() {
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error("No se encontró VITE_GEMINI_API_KEY");
+        throw new Error("No se encontró la variable VITE_GEMINI_API_KEY");
       }
 
       const response = await fetch(
@@ -31,11 +30,11 @@ function App() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: currentInput }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 800,
-            },
+            contents: [
+              {
+                parts: [{ text: currentInput }],
+              },
+            ],
           }),
         }
       );
@@ -43,50 +42,47 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error?.message || 'Error en la respuesta');
+        throw new Error(data.error?.message || 'Error en la respuesta de Gemini');
       }
 
       const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta del modelo.";
 
       setMessages((prev) => [...prev, { text: botReply, sender: 'model' }]);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error al consultar la API:", error);
       setMessages((prev) => [
         ...prev,
-        { text: "Ocurrió un error al consultar la IA. Intenta de nuevo.", sender: 'model' },
+        { text: "Ocurrió un error al consultar la IA. Verifica tu API Key en Vercel.", sender: 'model' },
       ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCopy = (text, idx) => {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-999999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      setCopiedIndex(idx);
-      setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (err) {
-      console.error('Error al copiar', err);
-    }
-    document.body.removeChild(textArea);
+  const handleClearSession = () => {
+    setMessages([]);
   };
 
   return (
     <div className="app-layout">
       <aside className="sidebar">
-        <button className="btn-icon-new" onClick={() => setMessages([])} title="Nuevo Chat">
-          +
-        </button>
-        <button className="btn-delete-session" onClick={() => setMessages([])} title="Borrar sesión">
-          🗑️
-        </button>
+        <div className="sidebar-top">
+          <button className="btn-icon-new" onClick={handleClearSession} title="Nuevo Chat">
+            +
+          </button>
+        </div>
+
+        <div className="history-list">
+          {messages.length > 0 && (
+            <div className="history-item active">Chat activo</div>
+          )}
+        </div>
+
+        <div className="sidebar-bottom">
+          <button className="btn-delete-session" onClick={handleClearSession} title="Borrar sesión">
+            🗑️
+          </button>
+        </div>
       </aside>
 
       <main className="chat-container">
@@ -101,11 +97,6 @@ function App() {
               <div key={idx} className={`message-row ${msg.sender}`}>
                 <div className="message-content">
                   <p>{msg.text}</p>
-                  {msg.sender === 'model' && (
-                    <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
-                      {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
-                    </button>
-                  )}
                 </div>
               </div>
             ))}
