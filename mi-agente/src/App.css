@@ -1,8 +1,3 @@
-.text-body {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 :root {
   --bg-dark: #131314;
   --sidebar-bg: #1e1f20;
@@ -205,9 +200,29 @@ body {
   color: var(--text-primary);
 }
 
-.loading-text {
+.text-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thinking-indicator {
   color: var(--text-secondary);
   font-style: italic;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dots {
+  display: inline-block;
+  animation: pulseDots 1.4s infinite ease-in-out;
+}
+
+@keyframes pulseDots {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
 }
 
 .btn-copy {

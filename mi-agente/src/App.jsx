@@ -59,7 +59,6 @@ function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            // Instrucción explícita para evitar símbolos de Markdown
             systemInstruction: {
               parts: [
                 {
@@ -214,22 +213,23 @@ function App() {
             {messages.map((msg, idx) => (
               <div key={idx} className={`message-row ${msg.sender}`}>
                 <div className="message-content">
-                  <p className="text-body">{msg.text}</p>
-                  {msg.sender === 'model' && msg.text && (
-                    <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
-                      {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
-                    </button>
+                  {msg.sender === 'model' && msg.text === '' ? (
+                    <p className="thinking-indicator">
+                      Pensando<span className="dots">...</span>
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-body">{msg.text}</p>
+                      {msg.sender === 'model' && msg.text && (
+                        <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
+                          {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             ))}
-            {loading && messages[messages.length - 1]?.text === '' && (
-              <div className="message-row model">
-                <div className="message-content">
-                  <p className="loading-text">Nexus AI está pensando...</p>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
