@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import './App.css';
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -39,21 +37,28 @@ function App() {
     setLoading(true);
 
     try {
-      const contents = [];
+      // Instanciación dentro del manejador para asegurar que la API Key esté disponible
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("No se encontró VITE_GEMINI_API_KEY en el entorno.");
+      }
+      const ai = new GoogleGenAI({ apiKey });
+
+      const parts = [];
       
       if (currentFile) {
         const imagePart = await fileToGenerativePart(currentFile);
-        contents.push(imagePart);
+        parts.push(imagePart);
       }
       
       if (currentInput.trim()) {
-        contents.push(currentInput);
+        parts.push({ text: currentInput });
       }
 
-      // Llamada real al modelo Gemini 2.5 Flash
+      // Llamada corregida con Gemini 2.5 Flash
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: contents,
+        contents: parts,
       });
 
       setMessages((prev) => [...prev, { text: response.text, sender: 'model' }]);
