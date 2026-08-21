@@ -62,7 +62,7 @@ function App() {
             systemInstruction: {
               parts: [
                 {
-                  text: "Responde siempre en texto plano y de forma perfectamente estructurada. NO utilices asteriscos (*), comillas dobles innecesarias, numerales (#) ni guiones de formato (---). Si presentas listas, utiliza números o viñetas simples con saltos de línea claros."
+                  text: "Responde de forma clara, altamente legible y limpia. NO uses asteriscos (*) ni comillas innecesarias. Es OBLIGATORIO colocar un salto de línea doble entre cada elemento de una lista, sección o álbum para que el texto NO quede colapsado en un solo bloque continuo."
                 }
               ]
             },
@@ -213,7 +213,7 @@ function App() {
             {messages.map((msg, idx) => (
               <div key={idx} className={`message-row ${msg.sender}`}>
                 <div className="message-content">
-                  <p className="text-body">{msg.text}</p>
+                  <div className="text-body">{msg.text}</div>
                   {msg.sender === 'model' && msg.text && (
                     <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
                       {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
