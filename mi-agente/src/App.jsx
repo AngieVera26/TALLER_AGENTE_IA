@@ -32,6 +32,7 @@ function App() {
     setMessages([]);
   };
 
+  // Función para eliminar asteriscos, numerales y símbolos molestos de la respuesta
   const formatText = (text) => {
     if (!text) return '';
     return text
@@ -60,11 +61,11 @@ function App() {
 
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("No se encontró VITE_GEMINI_API_KEY");
+      if (!apiKey) throw new Error("No se encontró la clave VITE_GEMINI_API_KEY");
 
-      // Modelo corregido a gemini-1.5-flash
+      // Endpoint oficial y actualizado con el modelo correcto: gemini-3.6-flash
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -73,13 +74,12 @@ function App() {
               {
                 parts: [
                   {
-                    text: `Por favor responde de manera clara, estructurada y organizada usando saltos de línea. Pregunta: ${currentInput}`
+                    text: `Responde de forma clara, detallada y estructurada usando saltos de línea claros entre cada punto o sección. Pregunta: ${currentInput}`
                   }
                 ]
               }
             ],
             generationConfig: {
-              temperature: 0.7,
               maxOutputTokens: 3000,
             },
           }),
@@ -89,8 +89,8 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error("Error devuelto por Gemini:", data);
-        throw new Error(data.error?.message || 'Error en la consulta');
+        console.error("Detalle del error desde Google:", data);
+        throw new Error(data.error?.message || 'Error en la API');
       }
 
       const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta del modelo.";
@@ -112,7 +112,7 @@ function App() {
         }
       });
     } catch (error) {
-      console.error("Error en petición:", error);
+      console.error("Error capturado:", error);
       setMessages((prev) => [
         ...prev,
         { text: "Ocurrió un error al consultar la IA. Intenta de nuevo.", sender: 'model' },
