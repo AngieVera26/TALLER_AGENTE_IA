@@ -213,23 +213,24 @@ function App() {
             {messages.map((msg, idx) => (
               <div key={idx} className={`message-row ${msg.sender}`}>
                 <div className="message-content">
-                  {msg.sender === 'model' && msg.text === '' ? (
-                    <p className="thinking-indicator">
-                      Pensando<span className="dots">...</span>
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-body">{msg.text}</p>
-                      {msg.sender === 'model' && msg.text && (
-                        <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
-                          {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
-                        </button>
-                      )}
-                    </>
+                  <p className="text-body">{msg.text}</p>
+                  {msg.sender === 'model' && msg.text && (
+                    <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
+                      {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
+                    </button>
                   )}
                 </div>
               </div>
             ))}
+            {loading && (
+              <div className="message-row model">
+                <div className="message-content">
+                  <p className="thinking-indicator">
+                    Pensando<span className="dots">...</span>
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
