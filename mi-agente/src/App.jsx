@@ -53,13 +53,20 @@ function App() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) throw new Error("No se encontró VITE_GEMINI_API_KEY");
 
-      // Transmisión en tiempo real (Streaming) con 4000 tokens de límite
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            // Instrucción explícita para evitar símbolos de Markdown
+            systemInstruction: {
+              parts: [
+                {
+                  text: "Responde siempre en texto plano y de forma perfectamente estructurada. NO utilices asteriscos (*), comillas dobles innecesarias, numerales (#) ni guiones de formato (---). Si presentas listas, utiliza números o viñetas simples con saltos de línea claros."
+                }
+              ]
+            },
             contents: [{ parts: [{ text: currentInput }] }],
             generationConfig: {
               temperature: 0.7,
@@ -97,7 +104,7 @@ function App() {
                 return updated;
               });
             } catch (e) {
-              // Ignorar fragmentos parciales de la transmisión
+              // Ignorar fragmentos incompletos
             }
           }
         }
