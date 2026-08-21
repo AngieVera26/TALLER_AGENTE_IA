@@ -12,7 +12,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
-  // Cargar sesión activa al iniciar o cambiar de chat
   useEffect(() => {
     if (currentSessionId) {
       const activeSession = sessions.find((s) => s.id === currentSessionId);
@@ -24,7 +23,6 @@ function App() {
     }
   }, [currentSessionId]);
 
-  // Guardar todas las sesiones en localStorage cada vez que cambien
   useEffect(() => {
     localStorage.setItem('nexus_chats', JSON.stringify(sessions));
   }, [sessions]);
@@ -45,7 +43,6 @@ function App() {
     setInput('');
     setLoading(true);
 
-    // Gestionar ID de sesión
     let activeId = currentSessionId;
     if (!activeId) {
       activeId = Date.now().toString();
@@ -56,37 +53,68 @@ function App() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) throw new Error("No se encontró VITE_GEMINI_API_KEY");
 
+      // Transmisión en tiempo real (Streaming) con 4000 tokens de límite
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: currentInput }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 4000,
+            },
           }),
         }
       );
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || 'Error API');
+      if (!response.ok) throw new Error("Error en la respuesta");
 
-      const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta.";
-      const updatedMessages = [...newMessages, { text: botReply, sender: 'model' }];
+      setMessages((prev) => [...prev, { text: '', sender: 'model' }]);
 
-      setMessages(updatedMessages);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
 
-      // Actualizar o crear la sesión en el historial global
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const json = JSON.parse(line.replace('data: ', ''));
+              const textChunk = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              accumulatedText += textChunk;
+
+              setMessages((prev) => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { text: accumulatedText, sender: 'model' };
+                return updated;
+              });
+            } catch (e) {
+              // Ignorar fragmentos parciales de la transmisión
+            }
+          }
+        }
+      }
+
+      const finalMessages = [...newMessages, { text: accumulatedText, sender: 'model' }];
+
       setSessions((prevSessions) => {
         const existingIndex = prevSessions.findIndex((s) => s.id === activeId);
         const title = currentInput.length > 25 ? currentInput.substring(0, 25) + '...' : currentInput;
 
         if (existingIndex >= 0) {
           const updated = [...prevSessions];
-          updated[existingIndex].messages = updatedMessages;
+          updated[existingIndex].messages = finalMessages;
           return updated;
         } else {
-          return [{ id: activeId, title, messages: updatedMessages }, ...prevSessions];
+          return [{ id: activeId, title, messages: finalMessages }, ...prevSessions];
         }
       });
     } catch (error) {
@@ -171,7 +199,7 @@ function App() {
       <main className="chat-container">
         {messages.length === 0 ? (
           <div className="welcome-screen">
-            <h1 className="welcome-title">El micrófono es tuyo, Colega</h1>
+            <h1 className="welcome-title">El micrófono es tuyo, Angie</h1>
             <p className="welcome-subtitle">¿En qué puedo ayudarte hoy?</p>
           </div>
         ) : (
@@ -179,8 +207,8 @@ function App() {
             {messages.map((msg, idx) => (
               <div key={idx} className={`message-row ${msg.sender}`}>
                 <div className="message-content">
-                  <p>{msg.text}</p>
-                  {msg.sender === 'model' && (
+                  <p className="text-body">{msg.text}</p>
+                  {msg.sender === 'model' && msg.text && (
                     <button className="btn-copy" onClick={() => handleCopy(msg.text, idx)}>
                       {copiedIndex === idx ? '✓ Copiado' : '📋 Copiar'}
                     </button>
@@ -188,7 +216,7 @@ function App() {
                 </div>
               </div>
             ))}
-            {loading && (
+            {loading && messages[messages.length - 1]?.text === '' && (
               <div className="message-row model">
                 <div className="message-content">
                   <p className="loading-text">Nexus AI está pensando...</p>

@@ -1,3 +1,8 @@
+.text-body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 :root {
   --bg-dark: #131314;
   --sidebar-bg: #1e1f20;
