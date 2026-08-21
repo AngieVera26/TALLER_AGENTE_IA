@@ -20,9 +20,10 @@ function App() {
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error("No se encontró la variable VITE_GEMINI_API_KEY");
+        throw new Error("No se encontró VITE_GEMINI_API_KEY");
       }
 
+      // Solicitud optimizada con parametros de generación rapida
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
@@ -36,6 +37,10 @@ function App() {
                 parts: [{ text: currentInput }],
               },
             ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1000,
+            },
           }),
         }
       );
@@ -43,7 +48,7 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error?.message || 'Error en la respuesta de Gemini');
+        throw new Error(data.error?.message || 'Error en la respuesta');
       }
 
       const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta del modelo.";
@@ -53,17 +58,37 @@ function App() {
       console.error("Error al consultar la API:", error);
       setMessages((prev) => [
         ...prev,
-        { text: "Ocurrió un error al consultar la IA. Verifica tu API Key en Vercel.", sender: 'model' },
+        { text: "Ocurrió un error al consultar la IA. Intenta de nuevo.", sender: 'model' },
       ]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Función de copiado ultra compatible
   const handleCopy = (text, idx) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(idx);
-    setTimeout(() => setCopiedIndex(null), 2000);
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiedIndex(idx);
+        setTimeout(() => setCopiedIndex(null), 2000);
+      });
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedIndex(idx);
+        setTimeout(() => setCopiedIndex(null), 2000);
+      } catch (err) {
+        console.error('Error al copiar text: ', err);
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   const handleClearSession = () => {
