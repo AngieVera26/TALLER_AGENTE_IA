@@ -32,6 +32,16 @@ function App() {
     setMessages([]);
   };
 
+  // Función para remover asteriscos, numerales y limpiar formato Markdown
+  const formatText = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/^#+\s*/gm, '')
+      .replace(/---+/g, '');
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
@@ -53,67 +63,42 @@ function App() {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) throw new Error("No se encontró VITE_GEMINI_API_KEY");
 
+      // Consulta limpia y directa a la API
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            systemInstruction: {
-              parts: [
-                {
-                  text: "Responde de forma clara y organizada. Utiliza saltos de línea para separar cada elemento o párrafo. No agregues asteriscos ni comillas innecesarias."
-                }
-              ]
-            },
-            contents: [{ parts: [{ text: currentInput }] }],
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Por favor responde de manera clara, estructurada y organizada usando saltos de línea. Pregunta: ${currentInput}`
+                  }
+                ]
+              }
+            ],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 4000,
+              maxOutputTokens: 3000,
             },
           }),
         }
       );
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errData = await response.json();
-        console.error("Detalle del error de la API:", errData);
-        throw new Error("Error en la respuesta");
+        console.error("Error devuelto por Gemini:", data);
+        throw new Error(data.error?.message || 'Error en la consulta');
       }
 
-      setMessages((prev) => [...prev, { text: '', sender: 'model' }]);
+      const rawReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta del modelo.";
+      const cleanReply = formatText(rawReply);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedText = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const json = JSON.parse(line.replace('data: ', ''));
-              const textChunk = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              accumulatedText += textChunk;
-
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { text: accumulatedText, sender: 'model' };
-                return updated;
-              });
-            } catch (e) {
-              // Ignorar fragmentos parciales
-            }
-          }
-        }
-      }
-
-      const finalMessages = [...newMessages, { text: accumulatedText, sender: 'model' }];
+      const updatedMessages = [...newMessages, { text: cleanReply, sender: 'model' }];
+      setMessages(updatedMessages);
 
       setSessions((prevSessions) => {
         const existingIndex = prevSessions.findIndex((s) => s.id === activeId);
@@ -121,14 +106,14 @@ function App() {
 
         if (existingIndex >= 0) {
           const updated = [...prevSessions];
-          updated[existingIndex].messages = finalMessages;
+          updated[existingIndex].messages = updatedMessages;
           return updated;
         } else {
-          return [{ id: activeId, title, messages: finalMessages }, ...prevSessions];
+          return [{ id: activeId, title, messages: updatedMessages }, ...prevSessions];
         }
       });
     } catch (error) {
-      console.error("Error al consultar:", error);
+      console.error("Error en petición:", error);
       setMessages((prev) => [
         ...prev,
         { text: "Ocurrió un error al consultar la IA. Intenta de nuevo.", sender: 'model' },
