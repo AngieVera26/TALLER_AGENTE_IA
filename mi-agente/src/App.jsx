@@ -62,7 +62,7 @@ function App() {
             systemInstruction: {
               parts: [
                 {
-                  text: "Responde de forma clara, altamente legible y limpia. NO uses asteriscos (*) ni comillas innecesarias. Es OBLIGATORIO colocar un salto de línea doble entre cada elemento de una lista, sección o álbum para que el texto NO quede colapsado en un solo bloque continuo."
+                  text: "Responde de forma clara y organizada. Utiliza saltos de línea para separar cada elemento o párrafo. No agregues asteriscos ni comillas innecesarias."
                 }
               ]
             },
@@ -75,7 +75,11 @@ function App() {
         }
       );
 
-      if (!response.ok) throw new Error("Error en la respuesta");
+      if (!response.ok) {
+        const errData = await response.json();
+        console.error("Detalle del error de la API:", errData);
+        throw new Error("Error en la respuesta");
+      }
 
       setMessages((prev) => [...prev, { text: '', sender: 'model' }]);
 
@@ -103,7 +107,7 @@ function App() {
                 return updated;
               });
             } catch (e) {
-              // Ignorar fragmentos incompletos
+              // Ignorar fragmentos parciales
             }
           }
         }
@@ -124,7 +128,7 @@ function App() {
         }
       });
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error al consultar:", error);
       setMessages((prev) => [
         ...prev,
         { text: "Ocurrió un error al consultar la IA. Intenta de nuevo.", sender: 'model' },
